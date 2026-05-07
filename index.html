@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+html<!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Progress & Dates</title>
+    <title>Run Coach Pro - Ready to Run</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #status-bar { 
@@ -15,18 +15,17 @@
         #current-mode { font-size: 1.2rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
         
         .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; text-align: center; }
-        .upload-group { margin: 10px 0; display: flex; flex-direction: column; gap: 5px; text-align: left; }
+        .upload-group { margin: 10px 0; display: flex; flex-direction: column; gap: 5px; text-align: left; font-size: 0.8rem; }
         
         #reset-btn { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 15px; font-weight: bold; font-size: 0.8rem; }
-        #reset-btn:hover { background: #c0392b; }
 
         .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
-        .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; position: relative; }
+        .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
         .lesson-card.completed { border-color: #2ecc71; background: #0f1a12; }
         
         .start-btn { width: 100%; padding: 10px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .check-container { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 0.8rem; }
-        .completion-date { font-size: 0.7rem; color: #888; height: 1em; } /* Gereserveerde ruimte voor datum */
+        .completion-date { font-size: 0.7rem; color: #888; }
     </style>
 </head>
 <body>
@@ -34,17 +33,18 @@
     <h1>🏃‍♂️ Run Coach Pro</h1>
 
     <div id="status-bar">
-        <div id="current-mode">Kies muziek & start</div>
+        <div id="current-mode">Klaar om te starten?</div>
         <div id="timer">00:00</div>
     </div>
 
     <div class="setup-section">
-        <strong>Instellingen</strong>
+        <strong>Muziekinstellingen</strong>
         <div class="upload-group">
-            <label>WANDELEN: <input type="file" id="upload-w" accept="audio/*" multiple></label>
-            <label>HARDLOPEN: <input type="file" id="upload-l" accept="audio/*" multiple></label>
+            <label>Wandelen: <input type="file" id="upload-w" accept="audio/*" multiple></label>
+            <label>Hardlopen: <input type="file" id="upload-l" accept="audio/*" multiple></label>
         </div>
-        <button id="reset-btn">WIS ALLE VOORTGANG</button>
+        <p style="font-size: 0.7rem; color: #888;">Standaard muziek is geladen. Voeg eigen MP3's toe om deze te overschrijven.</p>
+        <button id="reset-btn">WIS VOORTGANG</button>
     </div>
 
     <div class="lesson-grid" id="lessonGrid"></div>
@@ -52,24 +52,44 @@
     <script>
         const audio = new Audio();
         let timerInterval = null;
-        const playlists = { w: [], l: [] };
         let currentType = '';
+
+        // STANDAARD BESTANDEN (Rechtenvrij)
+        const playlists = { 
+            w: ["https://soundhelix.com"], 
+            l: ["https://soundhelix.com"] 
+        };
 
         audio.onended = () => { if(currentType) speelMuziek(currentType); };
 
-        // Muziek uploads
         document.getElementById('upload-w').addEventListener('change', (e) => handleUpload(e, 'w'));
         document.getElementById('upload-l').addEventListener('change', (e) => handleUpload(e, 'l'));
 
         function handleUpload(event, type) {
             const files = Array.from(event.target.files);
+            // Bij upload vervangen we de standaard muziek door de eigen muziek
             playlists[type] = files.map(file => URL.createObjectURL(file));
+            spreekUit("Eigen muziek geladen");
         }
 
-        // Datum formatteren (dag-maand-jaar uur:min)
         function getNu() {
             const d = new Date();
             return `${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function speelMuziek(type) {
+            currentType = type;
+            const list = playlists[type];
+            const randomSong = list[Math.floor(Math.random() * list.length)];
+            audio.src = randomSong;
+            audio.play().catch(e => console.log("Audio start pas na klik"));
+        }
+
+        function spreekUit(tekst) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(tekst);
+            msg.lang = 'nl-NL';
+            window.speechSynthesis.speak(msg);
         }
 
         function buildGrid() {
@@ -91,16 +111,12 @@
                 `;
 
                 const checkbox = card.querySelector('input');
-                const dateSpan = card.querySelector('.completion-date');
-
                 checkbox.addEventListener('change', (e) => {
                     const status = e.target.checked;
                     const datum = status ? getNu() : '';
-                    const data = { done: status, date: datum };
-                    
-                    localStorage.setItem(`les-data-${i}`, JSON.stringify(data));
+                    localStorage.setItem(`les-data-${i}`, JSON.stringify({ done: status, date: datum }));
                     card.classList.toggle('completed', status);
-                    dateSpan.innerText = datum;
+                    card.querySelector('.completion-date').innerText = datum;
                 });
 
                 card.querySelector('.start-btn').addEventListener('click', () => runLes(schema, i));
@@ -108,29 +124,26 @@
             }
         }
 
-        // Reset functie
         document.getElementById('reset-btn').addEventListener('click', () => {
-            if(confirm("Weet je zeker dat je alle vinkjes en data wilt wissen?")) {
+            if(confirm("Alle vinkjes wissen?")) {
                 for(let i=1; i<=30; i++) localStorage.removeItem(`les-data-${i}`);
                 buildGrid();
             }
         });
 
         async function runLes(schema, nr) {
-            if (playlists.w.length === 0 || playlists.l.length === 0) {
-                alert("Upload eerst muziek!"); return;
-            }
             if (timerInterval) clearInterval(timerInterval);
-            const segs = schema.split('-');
+            spreekUit(`Les ${nr} gestart.`);
             
+            const segs = schema.split('-');
             for (let s of segs) {
                 let tijd = parseInt(s) * 60;
                 let type = s.slice(-1);
                 document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
-                currentType = type;
-                const list = playlists[type];
-                audio.src = list[Math.floor(Math.random() * list.length)];
-                audio.play();
+                document.getElementById('current-mode').style.color = type === 'w' ? "#3498db" : "#e74c3c";
+                
+                speelMuziek(type);
+                spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
 
                 await new Promise(res => {
                     timerInterval = setInterval(() => {
@@ -141,12 +154,13 @@
                 });
             }
             audio.pause();
-            // Automatisch afvinken
+            spreekUit("Training klaar!");
             const cb = document.querySelector(`#lessonGrid div:nth-child(${nr}) input`);
-            if(!cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+            cb.checked = true; cb.dispatchEvent(new Event('change'));
         }
 
-        buildGrid(); // Start de grid bij laden
+        buildGrid();
     </script>
 </body>
 </html>
+Use code with caution.
