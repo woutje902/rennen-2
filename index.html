@@ -3,164 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Extreme Audio Fix</title>
-    <link rel="stylesheet" href="https://unpkg.com" />
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        #timer { font-size: 4rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
-        #gps-stats { display: flex; justify-content: space-around; font-size: 1.1rem; color: #f1c40f; margin-top: 10px; border-top: 1px solid #333; padding-top: 10px; }
-        #now-playing { font-size: 0.75rem; color: #888; margin-top: 10px; font-style: italic; min-height: 1.2em; }
-        #map { height: 200px; width: 100%; max-width: 500px; border-radius: 15px; margin-bottom: 20px; border: 2px solid #333; }
-        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
-        .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
-        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        #unlock-audio { background: #f1c40f; color: black; padding: 20px; border-radius: 10px; border: none; font-weight: bold; margin-bottom: 15px; cursor: pointer; width: 100%; max-width: 500px; font-size: 1.2rem; }
-    </style>
+    <title>Run-Walk Tracker</title>
 </head>
 <body>
+    <h1>Interval Tracker</h1>
+    
+    <button id="startBtn">Start Training</button>
+    <p id="status">Status: Wachten op start...</p>
+    <p id="gps-data">Locatie: Onbekend</p>
 
-    <h1>🏃‍♂️ Run Coach Pro</h1>
+    <audio id="audioPlayer" preload="auto">
+        <source src="jouw-muziek.mp3" type="audio/mpeg">
+    </audio>
 
-    <button id="unlock-audio">⚠️ STAP 1: ACTIVEER AUDIO & GPS</button>
-
-    <div id="status-bar">
-        <div id="current-mode">Kies een les</div>
-        <div id="timer">00:00</div>
-        <div id="gps-stats">
-            <span><strong id="live-speed">0.0</strong> km/u</span>
-            <span><strong id="live-dist">0.00</strong> km</span>
-        </div>
-        <div id="now-playing">Muziek: Stand-by</div>
-    </div>
-
-    <div id="map"></div>
-    <div class="lesson-grid" id="lessonGrid"></div>
-
-    <script src="https://unpkg.com"></script>
     <script>
-        const playerW = new Audio(); // Toegewezen wandelspeler
-        const playerL = new Audio(); // Toegewezen loopspeler
-        let timerInterval, map, routeLine, watchId;
-        let routeCoords = [], totalDistance = 0, isRunning = false;
+        const startBtn = document.getElementById('startBtn');
+        const audio = document.getElementById('audioPlayer');
+        const statusText = document.getElementById('status');
+        const gpsText = document.getElementById('gps-data');
 
-        // Muzieklijsten met 40+ titels
-        const tracks = {
-            w: ["Jazz Strut 120", "Smooth Bossa 122", "Urban Chill 125", "Deep Walk 128", "Lounge Loop 120", "Midnight Sax 124", "Walking Bass 126", "Subway Pulse 122", "Morning Jazz 120", "Sun Step 130", "Lo-Fi Techno 125", "Acid Jazz 124", "Berlin Stroll 126", "Paris Swing 122", "Minimal Walk 128", "Electric Jazz 124", "Soft Techno 120", "Vintage Step 122", "Groovy Bass 125", "Chill Runner 128", "Modern Bop 130", "Digital Walk 122", "Bebop Stroll 124", "Jazz Fusion 126", "Steady Beat 128", "Warehouse Lounge 130", "Sax in the City 122", "Evening Glide 125", "Acoustic Step 124", "Blue Note Walk 120", "Retro Techno 122", "Nu-Jazz 125", "Glitch Stroll 128", "Mellow Jazz 120", "Tech Lounge 124", "Synth Walk 126", "Jazz Hop 128", "City Lights 130", "Cloud Walk 122", "Velvet Jazz 125"],
-            l: ["Hard Techno 140", "Speed Jazz 135", "Acid Sprint 145", "Swing Dash 132", "Techno Pulse 150", "Fast Sax 138", "Industrial Run 142", "Bop Dash 140", "Peak Techno 148", "Fusion Sprint 135", "Rave Runner 150", "Jazzy Jungle 145", "Deep Sprint 132", "Drum & Jazz 148", "High Speed 140", "Modern Swing 135", "Turbo Jazz 150", "Electric Sprint 138", "Hard Bop 140", "Cyber Techno 145", "Fast Lane 132", "Dark Run 148", "Brass Beat 140", "Techno Soul 135", "Neon Sprint 142", "Classic Jazz 138", "Warehouse 150", "Acid Swing 145", "Binary Run 132", "Velocity 148", "Mainstage 140", "Hyper Jazz 150", "Techno Core 138", "Smooth Runner 135", "Heavy Bass 142", "Jazzy Drill 145", "Great Dash 150", "Sonic Jazz 140", "Final Lap 150", "Adrenaline 145"]
-        };
+        // 1. Oplossing voor knoppen en audio op mobiel
+        startBtn.addEventListener('click', function() {
+            // Audio moet geïnitialiseerd worden via een gebruikersklik
+            audio.play().then(() => {
+                statusText.innerText = "Status: Muziek speelt en tracker gestart!";
+            }).catch(error => {
+                console.error("Audio fout:", error);
+                statusText.innerText = "Status: Klik opnieuw om audio te activeren.";
+            });
 
-        const evySchema = { 
-            1: "1l-1w-1l-1w-2l-2w-2l-2w-3l-3w", 2: "1l-1w-1l-1w-2l-2w-3l-3w-3l-3w", 
-            15: "7l-2w-8l-2w-10l-3w", 30: "30l" 
-            // Voeg hier de rest van het schema toe zoals eerder...
-        };
-
-        function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-
-        document.getElementById('unlock-audio').onclick = function() {
-            // Wek beide spelers direct
-            [playerW, playerL].forEach(p => { p.play().then(() => p.pause()); p.volume = 1; });
-            initMap(); startTracking();
-            this.style.display = 'none';
-            spreekUit("Audio klaar. Veel succes!");
-        };
-
-        function speelMuziek(type) {
-            const isWandelen = (type === 'w');
-            const activePlayer = isWandelen ? playerW : playerL;
-            const idlePlayer = isWandelen ? playerL : playerW;
-
-            // Stop de speler die niet nodig is
-            idlePlayer.pause();
-            idlePlayer.currentTime = 0;
-
-            // Stel de juiste bron in (FIX: We gebruiken verschillende bronnen voor W en L)
-            activePlayer.src = isWandelen 
-                ? "https://soundhelix.com" 
-                : "https://soundhelix.com";
-            
-            const trackName = shuffle([...tracks[type]])[0];
-            document.getElementById('now-playing').innerText = `🎵 Shuffle: ${trackName} BPM`;
-            
-            activePlayer.play().catch(e => console.log("Audio start error:", e));
-        }
-
-        function spreekUit(t) { window.speechSynthesis.cancel(); const m = new SpeechSynthesisUtterance(t); m.lang='nl-NL'; window.speechSynthesis.speak(m); }
-
-        async function runLes(schema, nr) {
-            isRunning = true; totalDistance = 0; routeCoords = [];
-            spreekUit(`Les ${nr} gestart.`);
-            const segs = schema.match(/(\d+[wl])/g);
-            for (let s of segs) {
-                let tijd = parseInt(s) * 60;
-                let type = s.slice(-1);
-                document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
-                document.getElementById('current-mode').style.color = type === 'w' ? "#3498db" : "#2ecc71";
-                
-                speelMuziek(type);
-                spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
-                
-                await new Promise(res => {
-                    timerInterval = setInterval(() => {
-                        let m = Math.floor(tijd / 60), sec = tijd % 60;
-                        document.getElementById('timer').innerText = `${m}:${sec < 10 ? '0'+sec : sec}`;
-                        if (tijd === 30) spreekUit("Nog dertig seconden.");
-                        if (tijd-- <= 0) { clearInterval(timerInterval); res(); }
-                    }, 1000);
-                });
-            }
-            playerW.pause(); playerL.pause();
-            spreekUit("Klaar! Geweldig gedaan.");
-            isRunning = false;
-        }
-
-        // GPS Logica
-        function initMap() {
-            map = L.map('map').setView([52.3, 4.9], 15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            routeLine = L.polyline([], {color: '#2ecc71', weight: 5}).addTo(map);
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; const dLat = (lat2-lat1)*Math.PI/180; const dLon = (lon2-lon1)*Math.PI/180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        function startTracking() {
-            if ("geolocation" in navigator) {
-                watchId = navigator.geolocation.watchPosition((pos) => {
-                    if (!isRunning) return;
-                    const { latitude, longitude, speed } = pos.coords;
-                    if (routeCoords.length > 0) {
-                        const last = routeCoords[routeCoords.length - 1];
-                        totalDistance += calculateDistance(last[0], last[1], latitude, longitude);
-                        document.getElementById('live-dist').innerText = totalDistance.toFixed(2);
-                    }
-                    document.getElementById('live-speed').innerText = speed ? (speed * 3.6).toFixed(1) : "0.0";
-                    routeCoords.push([latitude, longitude]);
-                    routeLine.setLatLngs(routeCoords);
-                    map.panTo([latitude, longitude]);
-                }, null, { enableHighAccuracy: true });
-            }
-        }
-
-        function buildGrid() {
-            const g = document.getElementById('lessonGrid');
-            for (let i = 1; i <= 30; i++) {
-                const c = document.createElement('div'); c.className = 'lesson-card';
-                c.innerHTML = `<strong>Les ${i}</strong><br><button class="start-btn" data-les="${i}">START</button>`;
-                g.appendChild(c);
-            }
-        }
-
-        document.getElementById('lessonGrid').addEventListener('click', (e) => {
-            const n = e.target.getAttribute('data-les');
-            if (n) runLes(evySchema[n] || "1l-1w-1l", n);
+            // 2. Oplossing voor GPS
+            startGpsTracking();
         });
 
-        buildGrid();
+        function startGpsTracking() {
+            if ("geolocation" in navigator) {
+                // watchPosition is beter voor hardlopen dan getCurrentPosition
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        const lat = position.coords.latitude.toFixed(5);
+                        const lon = position.coords.longitude.toFixed(5);
+                        gpsText.innerText = `Locatie: ${lat}, ${lon}`;
+                    },
+                    (error) => {
+                        gpsText.innerText = `GPS Fout: ${error.message}`;
+                        console.error(error);
+                    },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                );
+            } else {
+                gpsText.innerText = "GPS wordt niet ondersteund door deze browser.";
+            }
+        }
     </script>
 </body>
 </html>
