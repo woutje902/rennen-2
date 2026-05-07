@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Coach Pro - Music & Wave Fix</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        #unlock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
+        .unlock-btn { background: #1DB954; color: black; border: none; padding: 20px 40px; border-radius: 50px; font-weight: bold; font-size: 1.5rem; cursor: pointer; box-shadow: 0 0 20px rgba(29, 185, 84, 0.5); }
+        
+        #status-bar { background: #1e1e1e; width: 100%; max-width: 500px; padding: 20px; border-radius: 20px; text-align: center; border: 1px solid #333; margin-bottom: 20px; }
+        #timer { font-size: 4rem; font-weight: bold; font-family: monospace; color: #1DB954; }
+        #now-playing { font-size: 0.9rem; color: #1DB954; margin: 10px 0; font-weight: bold; }
+        
+        /* Audio Waveform Animatie */
+        .wave-container { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 30px; margin: 10px 0; }
+        .wave-bar { width: 4px; background: #1DB954; border-radius: 2px; height: 5px; }
+        .playing .wave-bar { animation: wave 1s ease-in-out infinite; }
+        @keyframes wave { 
+            0%, 100% { height: 5px; } 
+            50% { height: 30px; } 
+        }
+        .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+
+        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; width: 100%; max-width: 600px; }
+        .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
+        .active-les { border: 2px solid #1DB954 !important; background: #1e3324 !important; }
+        .start-btn { width: 100%; padding: 10px; background: #1DB954; border: none; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="unlock-screen">
+        <button class="unlock-btn" id="initBtn">START COACH</button>
+        <p style="margin-top: 20px; color: #888;">Klik om audio en muziek te activeren</p>
+    </div>
+
+    <div id="status-bar">
+        <div id="current-mode">KIES EEN LES</div>
+        <div id="timer">00:00</div>
+        
+        <div class="wave-container" id="wave">
+            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        </div>
+        <div id="now-playing">Muziek staat klaar</div>
+    </div>
+
+    <div class="lesson-grid" id="lessonGrid"></div>
+
+    <script>
+        const audioPlayer = new Audio();
+        let timerInterval = null;
+
+        // Muzieklijsten (Directe Pixabay links)
+        const tracks = {
+            w: [{n: "Sunset Walker", u: "https://pixabay.com"}],
+            l: [{n: "Energy Run", u: "https://pixabay.com"}]
+        };
+
+        // 1. AUDIO UNLOCK (Essentieel voor Google Sites)
+        document.getElementById('initBtn').addEventListener('click', () => {
+            audioPlayer.src = tracks.w[0].u;
+            audioPlayer.play().then(() => {
+                audioPlayer.pause();
+                document.getElementById('unlock-screen').style.display = 'none';
+                spreekUit("Systeem geactiveerd. Veel succes.");
+            });
+        });
+
+        function spreekUit(tekst) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(tekst);
+            msg.lang = 'nl-NL';
+            window.speechSynthesis.speak(msg);
+        }
+
+        function playMusic(type) {
+            const track = tracks[type][0];
+            audioPlayer.src = track.u;
+            audioPlayer.loop = true;
+            audioPlayer.play();
+            document.getElementById('now-playing').innerText = `🎵 Nu speelt: ${track.n}`;
+            document.getElementById('wave').classList.add('playing');
+        }
+
+        // Lessen genereren
+        const grid = document.getElementById('lessonGrid');
+        for (let i = 1; i <= 30; i++) {
+            const schema = (i % 2 === 0) ? "2l-1w-2l" : "1l-1w-1l";
+            const card = document.createElement('div');
+            card.className = 'lesson-card';
+            card.id = `les-${i}`;
+            card.innerHTML = `<strong>Les ${i}</strong><br><small>${schema}</small><button class="start-btn">START</button>`;
+            
+            card.querySelector('button').addEventListener('click', () => startLes(i, schema));
+            grid.appendChild(card);
+        }
+
+        async function startLes(num, schema) {
+            if (timerInterval) clearInterval(timerInterval);
+            document.querySelectorAll('.lesson-card').forEach(c => c.classList.remove('active-les'));
+            document.getElementById(`les-${num}`).classList.add('active-les');
+
+            const segmenten = schema.split('-');
+            for (let seg of segmenten) {
+                const tijd = parseInt(seg);
+                const type = seg.slice(-1).toLowerCase();
+                
+                document.getElementById('current-mode').innerText = (type === 'w' ? "Wandelen" : "Hardlopen");
+                playMusic(type);
+                spreekUit(`Begin nu met ${tijd} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
+
+                await new Promise(resolve => {
+                    let over = tijd * 60;
+                    timerInterval = setInterval(() => {
+                        const m = Math.floor(over / 60), s = over % 60;
+                        document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                        if (over-- <= 0) { clearInterval(timerInterval); resolve(); }
+                    }, 1000);
+                });
+            }
+            audioPlayer.pause();
+            document.getElementById('wave').classList.remove('playing');
+        }
+    </script>
+</body>
+</html>
