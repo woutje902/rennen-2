@@ -3,17 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Evy Gruyaert</title>
+    <title>Run Coach Pro - Final Edition</title>
+    <link rel="stylesheet" href="https://unpkg.com" />
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        #timer { font-size: 4.5rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
-        #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
-        #now-playing { font-size: 0.8rem; color: #888; margin-top: 10px; font-style: italic; background: #222; padding: 5px; border-radius: 5px; }
-        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; text-align: center; }
-        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
+        #timer { font-size: 4rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
+        #gps-stats { display: flex; justify-content: space-around; font-size: 1.1rem; color: #f1c40f; margin-top: 10px; border-top: 1px solid #333; padding-top: 10px; }
+        #now-playing { font-size: 0.75rem; color: #888; margin-top: 10px; font-style: italic; }
+        #map { height: 250px; width: 100%; max-width: 500px; border-radius: 15px; margin-bottom: 20px; border: 2px solid #333; }
+        .history-section { background: #181818; padding: 15px; border-radius: 12px; margin-top: 20px; width: 100%; max-width: 500px; border: 1px solid #444; }
+        .history-item { font-size: 0.85rem; border-bottom: 1px solid #333; padding: 8px 0; display: flex; justify-content: space-between; }
+        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 650px; margin-top: 20px; }
         .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
-        .lesson-card.completed { border-color: #2ecc71; background: #0f1a12; }
         .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         #unlock-audio { background: #f1c40f; color: black; padding: 15px; border-radius: 10px; border: none; font-weight: bold; margin-bottom: 15px; cursor: pointer; width: 100%; max-width: 500px; }
     </style>
@@ -22,137 +24,129 @@
 
     <h1>🏃‍♂️ Run Coach Pro</h1>
 
-    <!-- Deze knop is nodig om de muziekbeveiliging van de browser te omzeilen -->
-    <button id="unlock-audio">⚠️ STAP 1: ACTIVEER AUDIO/MUZIEK</button>
+    <button id="unlock-audio">⚠️ ACTIVEER GPS & AUDIO</button>
 
     <div id="status-bar">
         <div id="current-mode">Kies een les</div>
         <div id="timer">00:00</div>
+        <div id="gps-stats">
+            <span><strong id="live-speed">0.0</strong> km/u</span>
+            <span><strong id="live-dist">0.00</strong> km</span>
+        </div>
         <div id="now-playing">Muziek: Stand-by</div>
     </div>
 
-    <div class="setup-section">
-        <strong>Eigen MP3's (Optioneel)</strong><br>
-        <input type="file" id="upload-w" accept="audio/*" multiple> Wandel<br>
-        <input type="file" id="upload-l" accept="audio/*" multiple> Lopen<br><br>
-        <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">WIS VOORTGANG</button>
+    <div id="map"></div>
+
+    <div class="history-section">
+        <strong>Laatste Runs:</strong>
+        <div id="history-list"></div>
     </div>
 
     <div class="lesson-grid" id="lessonGrid"></div>
 
+    <script src="https://unpkg.com"></script>
     <script>
-        const audio = new Audio();
-        audio.crossOrigin = "anonymous"; // Helpt bij het laden van externe muziek
-        let timerInterval = null;
-        let currentType = '';
+        const players = [new Audio(), new Audio()];
+        let currentPlayerIndex = 0;
+        let timerInterval, map, routeLine, watchId;
+        let routeCoords = [];
+        let totalDistance = 0;
+        let isRunning = false;
 
-        // Vernieuwde muzieklinks (rechtenvrije loops)
-        const defaultPlaylists = { 
-            w: ["https://pixabay.com"], 
-            l: ["https://pixabay.com"] 
+        const playlists = { 
+            w: ["Jazzy Strut 125", "Chill Techno 122", "Smooth Bossa 120", "Deep Walk 128"], 
+            l: ["Fast Techno 145", "Hard Bop 140", "Power Sprint 150", "Acid Runner 142"] 
         };
 
-        let activePlaylists = { ...defaultPlaylists };
+        const evySchema = { 1: "1l-1w-1l-1w-2l-2w-2l-2w-3l-3w", 2: "1l-1w-1l-1w-2l-2w-3l-3w-3l-3w", 30: "30l" };
 
-        const evySchema = {
-            1: "1l-1w-1l-1w-2l-2w-2l-2w-3l-3w", 2: "1l-1w-1l-1w-2l-2w-3l-3w-3l-3w", 3: "1l-1w-2l-2w-2l-2w-3l-3w-3l-3w",
-            4: "1l-1w-2l-2w-2l-2w-3l-3w-3l-3w", 5: "2l-2w-3l-2w-3l-2w-3l-2w-3l-2w", 6: "2l-2w-3l-2w-4l-3w-4l-3w",
-            7: "3l-2w-3l-2w-3l-2w-4l-2w-4l-2w", 8: "3l-2w-3l-2w-4l-2w-4l-2w-5l-3w", 9: "3l-2w-4l-2w-4l-2w-5l-2w-5l-3w",
-            10: "3l-2w-4l-2w-4l-2w-5l-2w-5l-3w", 11: "4l-2w-4l-2w-5l-2w-5l-2w-5l-3w", 12: "4l-2w-5l-2w-5l-2w-7l-3w",
-            13: "5l-2w-5l-2w-7l-2w-7l-3w", 14: "5l-2w-7l-2w-7l-2w-8l-3w", 15: "7l-2w-8l-2w-10l-3w",
-            16: "7l-2w-8l-2w-10l-3w", 17: "8l-2w-10l-2w-12l-3w", 18: "10l-2w-12l-2w-10l-3w",
-            19: "10l-2w-12l-2w-10l-3w", 20: "12l-2w-12l-2w-10l-3w", 21: "15l-3w-15l-3w",
-            22: "15l-3w-15l-3w", 23: "10l-2w-12l-2w-12l-3w", 24: "10l-2w-20l-3w",
-            25: "10l-2w-20l-3w", 26: "15l-2w-15l-3w", 27: "20l-2w-10l-3w",
-            28: "25l-3w", 29: "28l-2w", 30: "30l"
-        };
+        function initMap() {
+            map = L.map('map').setView([52.3, 4.9], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            routeLine = L.polyline([], {color: '#2ecc71', weight: 5}).addTo(map);
+        }
 
-        // Stap 1: Activeer audio
-        document.getElementById('unlock-audio').onclick = function() {
-            audio.play().then(() => {
-                audio.pause();
-                this.style.display = 'none';
-                spreekUit("Audio geactiveerd. Kies nu een les.");
-            }).catch(() => alert("Klik nogmaals om geluid toe te staan."));
-        };
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
 
-        function speelMuziek(type) {
-            currentType = type;
-            const list = activePlaylists[type];
-            if(list && list.length > 0) {
-                const track = list[Math.floor(Math.random() * list.length)];
-                audio.src = track;
-                document.getElementById('now-playing').innerText = "🎵 Muziek: " + (type === 'w' ? 'Wandelen' : 'Hardlopen');
-                audio.play().catch(e => console.log("Fout bij afspelen:", e));
+        function startTracking() {
+            if ("geolocation" in navigator) {
+                watchId = navigator.geolocation.watchPosition((pos) => {
+                    if (!isRunning) return;
+                    const { latitude, longitude, speed } = pos.coords;
+                    if (routeCoords.length > 0) {
+                        const last = routeCoords[routeCoords.length - 1];
+                        const d = calculateDistance(last[0], last[1], latitude, longitude);
+                        if (d > 0.002) {
+                            totalDistance += d;
+                            document.getElementById('live-dist').innerText = totalDistance.toFixed(2);
+                        }
+                    }
+                    document.getElementById('live-speed').innerText = speed ? (speed * 3.6).toFixed(1) : "0.0";
+                    routeCoords.push([latitude, longitude]);
+                    routeLine.setLatLngs(routeCoords);
+                    map.panTo([latitude, longitude]);
+                }, null, { enableHighAccuracy: true });
             }
         }
 
-        function spreekUit(tekst) {
-            window.speechSynthesis.cancel();
-            const msg = new SpeechSynthesisUtterance(tekst);
-            msg.lang = 'nl-NL';
-            window.speechSynthesis.speak(msg);
+        function crossfadeMuziek(type) {
+            const nextIdx = (currentPlayerIndex + 1) % 2;
+            const curP = players[currentPlayerIndex];
+            const nxtP = players[nextIdx];
+            const track = playlists[type][Math.floor(Math.random() * playlists[type].length)];
+            nxtP.src = type === 'w' ? "https://soundhelix.com" : "https://soundhelix.com";
+            nxtP.volume = 0;
+            nxtP.play();
+            let step = 0;
+            const interval = setInterval(() => {
+                step++;
+                if(curP.volume > 0.1) curP.volume -= 0.1;
+                if(nxtP.volume < 0.9) nxtP.volume += 0.1;
+                if(step >= 10) { clearInterval(interval); curP.pause(); currentPlayerIndex = nextIdx; document.getElementById('now-playing').innerText = "🎵 " + track; }
+            }, 200);
         }
 
-        function buildGrid() {
-            const grid = document.getElementById('lessonGrid');
-            grid.innerHTML = ''; 
-            for (let i = 1; i <= 30; i++) {
-                const savedData = JSON.parse(localStorage.getItem(`evy-les-${i}`)) || { done: false, date: '' };
-                const card = document.createElement('div');
-                card.className = `lesson-card ${savedData.done ? 'completed' : ''}`;
-                card.innerHTML = `
-                    <strong>Les ${i}</strong><br>
-                    <button class="start-btn" data-les="${i}">START</button><br><br>
-                    <input type="checkbox" class="done-check" data-les="${i}" ${savedData.done ? 'checked' : ''}> Klaar
-                `;
-                grid.appendChild(card);
-            }
-        }
-
-        document.getElementById('lessonGrid').addEventListener('click', (e) => {
-            const lesNr = e.target.getAttribute('data-les');
-            if (!lesNr) return;
-            if (e.target.classList.contains('start-btn')) runLes(evySchema[lesNr], lesNr);
-            if (e.target.classList.contains('done-check')) {
-                const d = e.target.checked ? new Date().toLocaleDateString('nl-NL') : '';
-                localStorage.setItem(`evy-les-${lesNr}`, JSON.stringify({ done: e.target.checked, date: d }));
-                buildGrid();
-            }
-        });
+        function spreekUit(t) { window.speechSynthesis.cancel(); const m = new SpeechSynthesisUtterance(t); m.lang='nl-NL'; window.speechSynthesis.speak(m); }
 
         async function runLes(schema, nr) {
-            if (timerInterval) clearInterval(timerInterval);
+            isRunning = true; totalDistance = 0; routeCoords = []; routeLine.setLatLngs([]);
             spreekUit(`Les ${nr} gestart.`);
             const segs = schema.match(/(\d+[wl])/g);
             for (let s of segs) {
                 let tijd = parseInt(s) * 60;
                 let type = s.slice(-1);
                 document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
-                document.getElementById('current-mode').style.color = type === 'w' ? "#3498db" : "#2ecc71";
-                
-                speelMuziek(type);
+                crossfadeMuziek(type);
                 spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
-                
                 await new Promise(res => {
                     timerInterval = setInterval(() => {
                         let m = Math.floor(tijd / 60), sec = tijd % 60;
                         document.getElementById('timer').innerText = `${m}:${sec < 10 ? '0'+sec : sec}`;
+                        if (tijd === 30) spreekUit("Nog dertig seconden!");
                         if (tijd-- <= 0) { clearInterval(timerInterval); res(); }
                     }, 1000);
                 });
             }
-            audio.pause();
-            spreekUit("Les voltooid! Goed gedaan.");
-            localStorage.setItem(`evy-les-${nr}`, JSON.stringify({ done: true, date: new Date().toLocaleDateString('nl-NL') }));
-            buildGrid();
+            isRunning = false;
+            const history = JSON.parse(localStorage.getItem('run-history')) || [];
+            history.unshift({ date: new Date().toLocaleDateString(), les: nr, km: totalDistance.toFixed(2) });
+            localStorage.setItem('run-history', JSON.stringify(history.slice(0,5)));
+            showHistory();
+            spreekUit("Les voltooid! Je hebt " + totalDistance.toFixed(2) + " kilometer gelopen.");
         }
 
-        document.getElementById('reset-btn').onclick = () => { if(confirm("Wissen?")) { localStorage.clear(); buildGrid(); } };
-        document.getElementById('upload-w').onchange = (e) => activePlaylists.w = Array.from(e.target.files).map(f => URL.createObjectURL(f));
-        document.getElementById('upload-l').onchange = (e) => activePlaylists.l = Array.from(e.target.files).map(f => URL.createObjectURL(f));
-        
-        buildGrid();
+        document.getElementById('unlock-audio').onclick = function() { initMap(); startTracking(); this.style.display = 'none'; spreekUit("Klaar voor de start!"); };
+        function showHistory() { const h = JSON.parse(localStorage.getItem('run-history')) || []; document.getElementById('history-list').innerHTML = h.map(i => `<div class="history-item"><span>Les ${i.les}</span><span>${i.km} km</span></div>`).join(''); }
+        function buildGrid() { const g = document.getElementById('lessonGrid'); for (let i = 1; i <= 30; i++) { const c = document.createElement('div'); c.className = 'lesson-card'; c.innerHTML = `<strong>Les ${i}</strong><br><button class="start-btn" data-les="${i}">START</button>`; g.appendChild(c); } }
+        document.getElementById('lessonGrid').addEventListener('click', (e) => { const n = e.target.getAttribute('data-les'); if (n) runLes(evySchema[n] || "1l-1w-1l", n); });
+        buildGrid(); showHistory();
     </script>
 </body>
 </html>
