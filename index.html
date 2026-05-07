@@ -3,24 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Playlist Mode</title>
+    <title>Run Coach Pro - Progress & Dates</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #status-bar { 
-            background: #1e1e1e; padding: 25px; border-radius: 20px; border: 1px solid #333; 
+            background: #1e1e1e; padding: 20px; border-radius: 20px; border: 1px solid #333; 
             width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px;
-            position: sticky; top: 10px; z-index: 100;
+            position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-        #timer { font-size: 4.5rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 10px 0; }
-        #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
+        #timer { font-size: 4rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
+        #current-mode { font-size: 1.2rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
         
-        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; }
-        .upload-group { margin: 10px 0; display: flex; flex-direction: column; gap: 5px; }
-        .count-tag { font-size: 0.7rem; background: #333; padding: 2px 6px; border-radius: 4px; color: #aaa; }
+        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; text-align: center; }
+        .upload-group { margin: 10px 0; display: flex; flex-direction: column; gap: 5px; text-align: left; }
         
-        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 600px; }
-        .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
-        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        #reset-btn { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 15px; font-weight: bold; font-size: 0.8rem; }
+        #reset-btn:hover { background: #c0392b; }
+
+        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
+        .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; position: relative; }
+        .lesson-card.completed { border-color: #2ecc71; background: #0f1a12; }
+        
+        .start-btn { width: 100%; padding: 10px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .check-container { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 0.8rem; }
+        .completion-date { font-size: 0.7rem; color: #888; height: 1em; } /* Gereserveerde ruimte voor datum */
     </style>
 </head>
 <body>
@@ -28,20 +34,17 @@
     <h1>🏃‍♂️ Run Coach Pro</h1>
 
     <div id="status-bar">
-        <div id="current-mode">Stel je playlist samen</div>
+        <div id="current-mode">Kies muziek & start</div>
         <div id="timer">00:00</div>
     </div>
 
     <div class="setup-section">
-        <strong>Stap 1: Selecteer meerdere nummers</strong>
+        <strong>Instellingen</strong>
         <div class="upload-group">
-            <label>WANDELEN (Rustig): <span id="cnt-w" class="count-tag">0 songs</span></label>
-            <input type="file" id="upload-w" accept="audio/*" multiple>
+            <label>WANDELEN: <input type="file" id="upload-w" accept="audio/*" multiple></label>
+            <label>HARDLOPEN: <input type="file" id="upload-l" accept="audio/*" multiple></label>
         </div>
-        <div class="upload-group">
-            <label>HARDLOPEN (Tempo): <span id="cnt-l" class="count-tag">0 songs</span></label>
-            <input type="file" id="upload-l" accept="audio/*" multiple>
-        </div>
+        <button id="reset-btn">WIS ALLE VOORTGANG</button>
     </div>
 
     <div class="lesson-grid" id="lessonGrid"></div>
@@ -49,71 +52,85 @@
     <script>
         const audio = new Audio();
         let timerInterval = null;
-        
-        // Arrays om meerdere song-URL's in op te slaan
         const playlists = { w: [], l: [] };
+        let currentType = '';
 
-        // Event listeners voor meerdere bestanden
+        audio.onended = () => { if(currentType) speelMuziek(currentType); };
+
+        // Muziek uploads
         document.getElementById('upload-w').addEventListener('change', (e) => handleUpload(e, 'w'));
         document.getElementById('upload-l').addEventListener('change', (e) => handleUpload(e, 'l'));
 
         function handleUpload(event, type) {
             const files = Array.from(event.target.files);
-            if (files.length > 0) {
-                // Maak URL's voor alle geselecteerde bestanden
-                playlists[type] = files.map(file => URL.createObjectURL(file));
-                document.getElementById(`cnt-${type}`).innerText = `${files.length} songs geladen`;
-                spreekUit(`${files.length} nummers toegevoegd voor ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
+            playlists[type] = files.map(file => URL.createObjectURL(file));
+        }
+
+        // Datum formatteren (dag-maand-jaar uur:min)
+        function getNu() {
+            const d = new Date();
+            return `${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function buildGrid() {
+            const grid = document.getElementById('lessonGrid');
+            grid.innerHTML = ''; 
+            for (let i = 1; i <= 30; i++) {
+                const savedData = JSON.parse(localStorage.getItem(`les-data-${i}`)) || { done: false, date: '' };
+                const schema = (i % 2 === 0) ? "2l-1w-2l" : "1l-1w-1l";
+                
+                const card = document.createElement('div');
+                card.className = `lesson-card ${savedData.done ? 'completed' : ''}`;
+                card.innerHTML = `
+                    <strong>Les ${i}</strong>
+                    <button class="start-btn">START</button>
+                    <div class="check-container">
+                        <label><input type="checkbox" ${savedData.done ? 'checked' : ''}> Klaar</label>
+                        <span class="completion-date">${savedData.date || ''}</span>
+                    </div>
+                `;
+
+                const checkbox = card.querySelector('input');
+                const dateSpan = card.querySelector('.completion-date');
+
+                checkbox.addEventListener('change', (e) => {
+                    const status = e.target.checked;
+                    const datum = status ? getNu() : '';
+                    const data = { done: status, date: datum };
+                    
+                    localStorage.setItem(`les-data-${i}`, JSON.stringify(data));
+                    card.classList.toggle('completed', status);
+                    dateSpan.innerText = datum;
+                });
+
+                card.querySelector('.start-btn').addEventListener('click', () => runLes(schema, i));
+                grid.appendChild(card);
             }
         }
 
-        function spreekUit(tekst) {
-            window.speechSynthesis.cancel();
-            const msg = new SpeechSynthesisUtterance(tekst);
-            msg.lang = 'nl-NL';
-            window.speechSynthesis.speak(msg);
-        }
-
-        // Simpele functie om een willekeurig nummer uit de lijst te pakken
-        function speelMuziek(type) {
-            const list = playlists[type];
-            if (list.length > 0) {
-                const randomSong = list[Math.floor(Math.random() * list.length)];
-                audio.src = randomSong;
-                audio.loop = true; // Je kunt dit ook op false zetten en 'ended' event gebruiken voor volgende song
-                audio.play().catch(e => console.log("Afspeelfout"));
+        // Reset functie
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            if(confirm("Weet je zeker dat je alle vinkjes en data wilt wissen?")) {
+                for(let i=1; i<=30; i++) localStorage.removeItem(`les-data-${i}`);
+                buildGrid();
             }
-        }
-
-        const grid = document.getElementById('lessonGrid');
-        for (let i = 1; i <= 30; i++) {
-            const schema = (i % 2 === 0) ? "2l-1w-2l" : "1l-1w-1l";
-            const card = document.createElement('div');
-            card.className = 'lesson-card';
-            card.innerHTML = `<strong>Les ${i}</strong><br><button class="start-btn" style="margin-top:10px">START</button>`;
-            card.querySelector('button').addEventListener('click', () => runLes(schema, i));
-            grid.appendChild(card);
-        }
+        });
 
         async function runLes(schema, nr) {
             if (playlists.w.length === 0 || playlists.l.length === 0) {
-                alert("Selecteer eerst voor beide modi minimaal één nummer!");
-                return;
+                alert("Upload eerst muziek!"); return;
             }
-
             if (timerInterval) clearInterval(timerInterval);
-            spreekUit(`Les ${nr} gestart.`);
-            
             const segs = schema.split('-');
+            
             for (let s of segs) {
                 let tijd = parseInt(s) * 60;
                 let type = s.slice(-1);
-                
                 document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
-                document.getElementById('current-mode').style.color = type === 'w' ? "#3498db" : "#e74c3c";
-                
-                speelMuziek(type);
-                spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
+                currentType = type;
+                const list = playlists[type];
+                audio.src = list[Math.floor(Math.random() * list.length)];
+                audio.play();
 
                 await new Promise(res => {
                     timerInterval = setInterval(() => {
@@ -124,8 +141,12 @@
                 });
             }
             audio.pause();
-            spreekUit("Training voltooid!");
+            // Automatisch afvinken
+            const cb = document.querySelector(`#lessonGrid div:nth-child(${nr}) input`);
+            if(!cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
         }
+
+        buildGrid(); // Start de grid bij laden
     </script>
 </body>
 </html>
