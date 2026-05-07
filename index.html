@@ -4,29 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Run-Walk Tracker</title>
-    <style>
-        .timestamp { font-size: 0.8em; color: #666; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-        .dashboard { font-family: sans-serif; padding: 20px; }
-        button { padding: 15px 30px; font-size: 1.1em; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
-        .data-field { margin-top: 15px; font-weight: bold; }
-    </style>
 </head>
-<body class="dashboard">
-
-    <!-- Datum van laatste aanpassing -->
-    <div class="timestamp">Laatst aangepast: 07-05-2026 14:18:14</div>
-
+<body>
+    <div style="font-size: 0.8em; color: gray;">Laatst aangepast: 07-05-2024</div>
     <h1>Interval Tracker</h1>
     
-    <button id="startBtn">Start Training</button>
+    <button id="startBtn" style="padding: 20px; font-size: 20px;">START TRAINING</button>
     
-    <div class="data-field" id="status">Status: Wachten op actie...</div>
-    <div class="data-field" id="gps-data">Locatie: Onbekend</div>
+    <p id="status">Status: Klik op start</p>
+    <p id="gps-data">Locatie: Zoeken...</p>
 
-    <!-- Audio element met een fallback melding -->
-    <audio id="audioPlayer" preload="auto">
-        <source src="jouw-muziek.mp3" type="audio/mpeg">
-        Je browser ondersteunt geen audio-elementen.
+    <audio id="audioPlayer">
+        <source src="muziek.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -35,38 +24,22 @@
         const statusText = document.getElementById('status');
         const gpsText = document.getElementById('gps-data');
 
-        // Gecombineerde startfunctie voor audio en GPS
-        startBtn.addEventListener('click', function() {
-            // 1. Audio activeren (User Interaction vereist)
-            audio.play()
-                .then(() => {
-                    statusText.innerText = "Status: Muziek speelt!";
-                    startBtn.innerText = "Training is bezig...";
-                    startBtn.style.background = "#28a745";
-                })
-                .catch(error => {
-                    console.error("Audio fout:", error);
-                    statusText.innerText = "Status: Klik opnieuw om audio te starten.";
-                });
+        startBtn.onclick = function() {
+            // Audio direct starten
+            audio.play();
+            statusText.innerText = "Status: Programma loopt";
 
-            // 2. GPS Tracking activeren
-            if ("geolocation" in navigator) {
-                navigator.geolocation.watchPosition(
-                    (position) => {
-                        const lat = position.coords.latitude.toFixed(5);
-                        const lon = position.coords.longitude.toFixed(5);
-                        const speed = position.coords.speed ? (position.coords.speed * 3.6).toFixed(1) : 0;
-                        gpsText.innerHTML = `Locatie: ${lat}, ${lon} <br>Snelheid: ${speed} km/u`;
-                    },
-                    (error) => {
-                        gpsText.innerText = `GPS Fout: ${error.message}`;
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
+            // GPS starten
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(function(position) {
+                    gpsText.innerText = "Locatie: " + position.coords.latitude.toFixed(4) + ", " + position.coords.longitude.toFixed(4);
+                }, function(error) {
+                    gpsText.innerText = "GPS Fout: " + error.message;
+                }, { enableHighAccuracy: true });
             } else {
-                gpsText.innerText = "GPS niet ondersteund op dit apparaat.";
+                gpsText.innerText = "Geen GPS beschikbaar";
             }
-        });
+        };
     </script>
 </body>
 </html>
