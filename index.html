@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Eigen Muziek</title>
+    <title>Run Coach Pro - Playlist Mode</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #status-bar { 
@@ -16,8 +16,8 @@
         
         .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; }
         .upload-group { margin: 10px 0; display: flex; flex-direction: column; gap: 5px; }
-        input[type="file"] { color: #888; font-size: 0.8rem; }
-
+        .count-tag { font-size: 0.7rem; background: #333; padding: 2px 6px; border-radius: 4px; color: #aaa; }
+        
         .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 600px; }
         .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
         .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; }
@@ -28,20 +28,19 @@
     <h1>🏃‍♂️ Run Coach Pro</h1>
 
     <div id="status-bar">
-        <div id="current-mode">Upload je muziek</div>
+        <div id="current-mode">Stel je playlist samen</div>
         <div id="timer">00:00</div>
     </div>
 
-    <!-- NIEUW: Upload sectie -->
     <div class="setup-section">
-        <strong>Stap 1: Kies je muziek (.mp3)</strong>
+        <strong>Stap 1: Selecteer meerdere nummers</strong>
         <div class="upload-group">
-            <label>Muziek voor WANDELEN:</label>
-            <input type="file" id="upload-w" accept="audio/*">
+            <label>WANDELEN (Rustig): <span id="cnt-w" class="count-tag">0 songs</span></label>
+            <input type="file" id="upload-w" accept="audio/*" multiple>
         </div>
         <div class="upload-group">
-            <label>Muziek voor HARDLOPEN:</label>
-            <input type="file" id="upload-l" accept="audio/*">
+            <label>HARDLOPEN (Tempo): <span id="cnt-l" class="count-tag">0 songs</span></label>
+            <input type="file" id="upload-l" accept="audio/*" multiple>
         </div>
     </div>
 
@@ -51,18 +50,20 @@
         const audio = new Audio();
         let timerInterval = null;
         
-        // Hier slaan we de "geüploade" bestanden tijdelijk op
-        const userSongs = { w: null, l: null };
+        // Arrays om meerdere song-URL's in op te slaan
+        const playlists = { w: [], l: [] };
 
-        // Luisteren naar uploads
+        // Event listeners voor meerdere bestanden
         document.getElementById('upload-w').addEventListener('change', (e) => handleUpload(e, 'w'));
         document.getElementById('upload-l').addEventListener('change', (e) => handleUpload(e, 'l'));
 
         function handleUpload(event, type) {
-            const file = event.target.files[0];
-            if (file) {
-                userSongs[type] = URL.createObjectURL(file);
-                spreekUit(`${type === 'w' ? 'Wandel' : 'Hardloop'} muziek geladen`);
+            const files = Array.from(event.target.files);
+            if (files.length > 0) {
+                // Maak URL's voor alle geselecteerde bestanden
+                playlists[type] = files.map(file => URL.createObjectURL(file));
+                document.getElementById(`cnt-${type}`).innerText = `${files.length} songs geladen`;
+                spreekUit(`${files.length} nummers toegevoegd voor ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
             }
         }
 
@@ -71,6 +72,17 @@
             const msg = new SpeechSynthesisUtterance(tekst);
             msg.lang = 'nl-NL';
             window.speechSynthesis.speak(msg);
+        }
+
+        // Simpele functie om een willekeurig nummer uit de lijst te pakken
+        function speelMuziek(type) {
+            const list = playlists[type];
+            if (list.length > 0) {
+                const randomSong = list[Math.floor(Math.random() * list.length)];
+                audio.src = randomSong;
+                audio.loop = true; // Je kunt dit ook op false zetten en 'ended' event gebruiken voor volgende song
+                audio.play().catch(e => console.log("Afspeelfout"));
+            }
         }
 
         const grid = document.getElementById('lessonGrid');
@@ -84,8 +96,8 @@
         }
 
         async function runLes(schema, nr) {
-            if (!userSongs.w || !userSongs.l) {
-                alert("Upload eerst muziek voor beide modi!");
+            if (playlists.w.length === 0 || playlists.l.length === 0) {
+                alert("Selecteer eerst voor beide modi minimaal één nummer!");
                 return;
             }
 
@@ -100,10 +112,7 @@
                 document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
                 document.getElementById('current-mode').style.color = type === 'w' ? "#3498db" : "#e74c3c";
                 
-                audio.src = userSongs[type];
-                audio.loop = true;
-                audio.play();
-                
+                speelMuziek(type);
                 spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
 
                 await new Promise(res => {
@@ -115,7 +124,7 @@
                 });
             }
             audio.pause();
-            spreekUit("Training klaar!");
+            spreekUit("Training voltooid!");
         }
     </script>
 </body>
