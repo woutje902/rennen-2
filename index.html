@@ -3,17 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Evy Gruyaert</title>
+    <title>Run Coach Pro - Evy Gruyaert Edition</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; }
+        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         #timer { font-size: 4.5rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
         #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
+        #now-playing { font-size: 0.75rem; color: #888; margin-top: 10px; font-style: italic; border-top: 1px solid #333; padding-top: 5px; }
         .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
         .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
         .lesson-card.completed { border-color: #2ecc71; background: #0f1a12; }
-        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        .start-btn:active { transform: scale(0.95); background: #27ae60; }
         .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; text-align: center; }
+        input[type="file"] { font-size: 0.7rem; margin: 5px 0; }
     </style>
 </head>
 <body>
@@ -22,14 +25,17 @@
     <div id="status-bar">
         <div id="current-mode">Kies een les</div>
         <div id="timer">00:00</div>
+        <div id="now-playing">Muziek: Stand-by</div>
     </div>
 
     <div class="setup-section">
-        <strong>Muziek Bron</strong><br>
-        <small>De app speelt automatisch wandel- of loopmuziek af.</small><br><br>
-        <input type="file" id="upload-w" accept="audio/*" multiple> Wandel MP3's<br>
-        <input type="file" id="upload-l" accept="audio/*" multiple> Loop MP3's<br><br>
-        <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">WIS VOORTGANG</button>
+        <strong>Audio Bronnen</strong><br>
+        <small style="color:#888">Standaard muziek is actief, of upload eigen MP3's:</small><br><br>
+        <div style="text-align: left; display: inline-block;">
+            Wandelen: <input type="file" id="upload-w" accept="audio/*" multiple><br>
+            Lopen: <input type="file" id="upload-l" accept="audio/*" multiple>
+        </div><br><br>
+        <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">WIS VOORTGANG</button>
     </div>
 
     <div class="lesson-grid" id="lessonGrid"></div>
@@ -39,16 +45,16 @@
         let timerInterval = null;
         let currentType = '';
 
-        // STANDAARD MUZIEK LINKS
+        // STANDAARD MUZIEK (SOUNDHELIX)
         const defaultPlaylists = { 
-            w: ["https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"], 
+            w: ["https://soundhelix.com"], 
             l: [
                 "https://soundhelix.com",
                 "https://soundhelix.com"
             ] 
         };
 
-        let activePlaylists = JSON.parse(JSON.stringify(defaultPlaylists));
+        let activePlaylists = { ...defaultPlaylists };
 
         const evySchema = {
             1: "1l-1w-1l-1w-2l-2w-2l-2w-3l-3w", 2: "1l-1w-1l-1w-2l-2w-3l-3w-3l-3w", 3: "1l-1w-2l-2w-2l-2w-3l-3w-3l-3w",
@@ -67,8 +73,12 @@
             currentType = type;
             const list = activePlaylists[type];
             if(list && list.length > 0) {
-                audio.src = list[Math.floor(Math.random() * list.length)];
-                audio.play().catch(() => console.log("Klik eerst op de pagina om audio te activeren."));
+                const track = list[Math.floor(Math.random() * list.length)];
+                audio.src = track;
+                // Visuele update
+                const trackName = track.includes('blob:') ? "Eigen bestand" : track.split('/').pop();
+                document.getElementById('now-playing').innerText = "🎵 Nu speelt: " + trackName;
+                audio.play().catch(e => console.log("Audio start pas na interactie"));
             }
         }
 
@@ -89,7 +99,7 @@
                 card.innerHTML = `
                     <strong>Les ${i}</strong><br>
                     <button class="start-btn" data-les="${i}">START LES</button><br><br>
-                    <input type="checkbox" class="done-check" data-les="${i}" ${savedData.done ? 'checked' : ''}> Voltooid
+                    <input type="checkbox" class="done-check" data-les="${i}" ${savedData.done ? 'checked' : ''}> Klaar
                     <div style="font-size:0.6rem; color:#888; margin-top:5px;">${savedData.date}</div>
                 `;
                 grid.appendChild(card);
@@ -99,11 +109,7 @@
         document.getElementById('lessonGrid').addEventListener('click', (e) => {
             const lesNr = e.target.getAttribute('data-les');
             if (!lesNr) return;
-
-            if (e.target.classList.contains('start-btn')) {
-                runLes(evySchema[lesNr], lesNr);
-            } 
-            
+            if (e.target.classList.contains('start-btn')) runLes(evySchema[lesNr], lesNr);
             if (e.target.classList.contains('done-check')) {
                 const d = e.target.checked ? new Date().toLocaleDateString('nl-NL') : '';
                 localStorage.setItem(`evy-les-${lesNr}`, JSON.stringify({ done: e.target.checked, date: d }));
@@ -113,7 +119,7 @@
 
         async function runLes(schema, nr) {
             if (timerInterval) clearInterval(timerInterval);
-            spreekUit(`Les ${nr} wordt gestart. Zet hem op!`);
+            spreekUit(`Les ${nr} gestart.`);
             const segs = schema.match(/(\d+[wl])/g);
             for (let s of segs) {
                 let tijd = parseInt(s) * 60;
@@ -133,7 +139,8 @@
                 });
             }
             audio.pause();
-            spreekUit("Geweldig! De les is klaar.");
+            document.getElementById('now-playing').innerText = "Les voltooid!";
+            spreekUit("Geweldig gewerkt! De les is klaar.");
             localStorage.setItem(`evy-les-${nr}`, JSON.stringify({ done: true, date: new Date().toLocaleDateString('nl-NL') }));
             buildGrid();
         }
