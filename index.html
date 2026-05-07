@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Evy Schema</title>
+    <title>Run Coach Pro - Evy Gruyaert</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; }
         #timer { font-size: 4.5rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
         #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
         .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
@@ -25,9 +25,10 @@
     </div>
 
     <div class="setup-section">
-        <strong>Eigen Muziek</strong><br>
-        <input type="file" id="upload-w" accept="audio/*" multiple> Wandel<br>
-        <input type="file" id="upload-l" accept="audio/*" multiple> Loop<br><br>
+        <strong>Muziek Bron</strong><br>
+        <small>De app speelt automatisch wandel- of loopmuziek af.</small><br><br>
+        <input type="file" id="upload-w" accept="audio/*" multiple> Wandel MP3's<br>
+        <input type="file" id="upload-l" accept="audio/*" multiple> Loop MP3's<br><br>
         <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">WIS VOORTGANG</button>
     </div>
 
@@ -37,6 +38,17 @@
         const audio = new Audio();
         let timerInterval = null;
         let currentType = '';
+
+        // STANDAARD MUZIEK LINKS
+        const defaultPlaylists = { 
+            w: ["https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"], 
+            l: [
+                "https://soundhelix.com",
+                "https://soundhelix.com"
+            ] 
+        };
+
+        let activePlaylists = JSON.parse(JSON.stringify(defaultPlaylists));
 
         const evySchema = {
             1: "1l-1w-1l-1w-2l-2w-2l-2w-3l-3w", 2: "1l-1w-1l-1w-2l-2w-3l-3w-3l-3w", 3: "1l-1w-2l-2w-2l-2w-3l-3w-3l-3w",
@@ -51,17 +63,12 @@
             28: "25l-3w", 29: "28l-2w", 30: "30l"
         };
 
-        let playlists = { 
-            w: ["https://soundhelix.com"], 
-            l: ["https://soundhelix.com"] 
-        };
-
         function speelMuziek(type) {
             currentType = type;
-            const list = playlists[type];
+            const list = activePlaylists[type];
             if(list && list.length > 0) {
                 audio.src = list[Math.floor(Math.random() * list.length)];
-                audio.play().catch(e => console.log("Audio trigger nodig"));
+                audio.play().catch(() => console.log("Klik eerst op de pagina om audio te activeren."));
             }
         }
 
@@ -81,15 +88,14 @@
                 card.className = `lesson-card ${savedData.done ? 'completed' : ''}`;
                 card.innerHTML = `
                     <strong>Les ${i}</strong><br>
-                    <button class="start-btn" data-les="${i}">START</button><br><br>
-                    <input type="checkbox" class="done-check" data-les="${i}" ${savedData.done ? 'checked' : ''}> Klaar
-                    <div style="font-size:0.6rem; color:#888;">${savedData.date}</div>
+                    <button class="start-btn" data-les="${i}">START LES</button><br><br>
+                    <input type="checkbox" class="done-check" data-les="${i}" ${savedData.done ? 'checked' : ''}> Voltooid
+                    <div style="font-size:0.6rem; color:#888; margin-top:5px;">${savedData.date}</div>
                 `;
                 grid.appendChild(card);
             }
         }
 
-        // EVENT DELEGATION: Eén luisteraar voor alle knoppen en checkboxes
         document.getElementById('lessonGrid').addEventListener('click', (e) => {
             const lesNr = e.target.getAttribute('data-les');
             if (!lesNr) return;
@@ -107,14 +113,17 @@
 
         async function runLes(schema, nr) {
             if (timerInterval) clearInterval(timerInterval);
-            spreekUit(`Les ${nr} gestart.`);
+            spreekUit(`Les ${nr} wordt gestart. Zet hem op!`);
             const segs = schema.match(/(\d+[wl])/g);
             for (let s of segs) {
                 let tijd = parseInt(s) * 60;
                 let type = s.slice(-1);
                 document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
+                document.getElementById('current-mode').style.color = type === 'w' ? "#3498db" : "#2ecc71";
+                
                 speelMuziek(type);
                 spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
+                
                 await new Promise(res => {
                     timerInterval = setInterval(() => {
                         let m = Math.floor(tijd / 60), sec = tijd % 60;
@@ -124,17 +133,16 @@
                 });
             }
             audio.pause();
-            spreekUit("Gedaan!");
+            spreekUit("Geweldig! De les is klaar.");
             localStorage.setItem(`evy-les-${nr}`, JSON.stringify({ done: true, date: new Date().toLocaleDateString('nl-NL') }));
             buildGrid();
         }
 
-        document.getElementById('reset-btn').onclick = () => { if(confirm("Wissen?")) { localStorage.clear(); buildGrid(); } };
-        document.getElementById('upload-w').onchange = (e) => playlists.w = Array.from(e.target.files).map(f => URL.createObjectURL(f));
-        document.getElementById('upload-l').onchange = (e) => playlists.l = Array.from(e.target.files).map(f => URL.createObjectURL(f));
+        document.getElementById('reset-btn').onclick = () => { if(confirm("Voortgang wissen?")) { localStorage.clear(); buildGrid(); } };
+        document.getElementById('upload-w').onchange = (e) => activePlaylists.w = Array.from(e.target.files).map(f => URL.createObjectURL(f));
+        document.getElementById('upload-l').onchange = (e) => activePlaylists.l = Array.from(e.target.files).map(f => URL.createObjectURL(f));
         
         buildGrid();
     </script>
 </body>
 </html>
-
