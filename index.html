@@ -3,71 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro</title>
+    <title>Run Coach Pro - Evy Schema</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        /* Stijl voor de laatste wijziging tekst */
-        #last-modified { font-size: 0.75rem; color: #555; margin-bottom: 10px; }
-        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 1px solid #333; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; }
-        #timer { font-size: 4rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
-        #current-mode { font-size: 1.2rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
-        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; }
-        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
+        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        #timer { font-size: 4.5rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
+        #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
+        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
         .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
         .lesson-card.completed { border-color: #2ecc71; background: #0f1a12; }
-        .start-btn { width: 100%; padding: 10px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; text-align: center; }
     </style>
 </head>
 <body>
 
-    <!-- Automatische datum van wijziging -->
-    <div id="last-modified">Laatst gewijzigd: <span id="mod-date"></span></div>
-
     <h1>🏃‍♂️ Run Coach Pro</h1>
-
     <div id="status-bar">
-        <div id="current-mode">Klaar?</div>
+        <div id="current-mode">Kies een les</div>
         <div id="timer">00:00</div>
     </div>
 
     <div class="setup-section">
-        <strong>Eigen muziek toevoegen (optioneel)</strong>
-        <div style="font-size: 0.8rem; margin: 10px 0; text-align: left;">
-            Wandelen: <input type="file" id="upload-w" accept="audio/*" multiple><br><br>
-            Hardlopen: <input type="file" id="upload-l" accept="audio/*" multiple>
-        </div>
-        <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">WIS VOORTGANG</button>
+        <strong>Eigen Muziek</strong><br>
+        <input type="file" id="upload-w" accept="audio/*" multiple> Wandel<br>
+        <input type="file" id="upload-l" accept="audio/*" multiple> Loop<br><br>
+        <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">WIS VOORTGANG</button>
     </div>
 
     <div class="lesson-grid" id="lessonGrid"></div>
 
     <script>
-        // Functie om de wijzigingsdatum van het bestand te tonen
-        function showLastModified() {
-            const modDate = document.lastModified;
-            document.getElementById('mod-date').innerText = modDate;
-        }
-
         const audio = new Audio();
         let timerInterval = null;
         let currentType = '';
+
+        const evySchema = {
+            1: "1l-1w-1l-1w-2l-2w-2l-2w-3l-3w", 2: "1l-1w-1l-1w-2l-2w-3l-3w-3l-3w", 3: "1l-1w-2l-2w-2l-2w-3l-3w-3l-3w",
+            4: "1l-1w-2l-2w-2l-2w-3l-3w-3l-3w", 5: "2l-2w-3l-2w-3l-2w-3l-2w-3l-2w", 6: "2l-2w-3l-2w-4l-3w-4l-3w",
+            7: "3l-2w-3l-2w-3l-2w-4l-2w-4l-2w", 8: "3l-2w-3l-2w-4l-2w-4l-2w-5l-3w", 9: "3l-2w-4l-2w-4l-2w-5l-2w-5l-3w",
+            10: "3l-2w-4l-2w-4l-2w-5l-2w-5l-3w", 11: "4l-2w-4l-2w-5l-2w-5l-2w-5l-3w", 12: "4l-2w-5l-2w-5l-2w-7l-3w",
+            13: "5l-2w-5l-2w-7l-2w-7l-3w", 14: "5l-2w-7l-2w-7l-2w-8l-3w", 15: "7l-2w-8l-2w-10l-3w",
+            16: "7l-2w-8l-2w-10l-3w", 17: "8l-2w-10l-2w-12l-3w", 18: "10l-2w-12l-2w-10l-3w",
+            19: "10l-2w-12l-2w-10l-3w", 20: "12l-2w-12l-2w-10l-3w", 21: "15l-3w-15l-3w",
+            22: "15l-3w-15l-3w", 23: "10l-2w-12l-2w-12l-3w", 24: "10l-2w-20l-3w",
+            25: "10l-2w-20l-3w", 26: "15l-2w-15l-3w", 27: "20l-2w-10l-3w",
+            28: "25l-3w", 29: "28l-2w", 30: "30l"
+        };
 
         let playlists = { 
             w: ["https://soundhelix.com"], 
             l: ["https://soundhelix.com"] 
         };
 
-        audio.onended = () => { if(currentType) speelMuziek(currentType); };
-
-        document.getElementById('upload-w').onchange = (e) => playlists.w = Array.from(e.target.files).map(f => URL.createObjectURL(f));
-        document.getElementById('upload-l').onchange = (e) => playlists.l = Array.from(e.target.files).map(f => URL.createObjectURL(f));
-
         function speelMuziek(type) {
             currentType = type;
             const list = playlists[type];
             if(list && list.length > 0) {
                 audio.src = list[Math.floor(Math.random() * list.length)];
-                audio.play().catch(e => console.log("Klik eerst op de pagina"));
+                audio.play().catch(e => console.log("Audio trigger nodig"));
             }
         }
 
@@ -82,26 +76,39 @@
             const grid = document.getElementById('lessonGrid');
             grid.innerHTML = ''; 
             for (let i = 1; i <= 30; i++) {
-                const savedData = JSON.parse(localStorage.getItem(`les-data-${i}`)) || { done: false, date: '' };
-                const schema = (i % 2 === 0) ? "2l-1w-2l" : "1l-1w-1l";
+                const savedData = JSON.parse(localStorage.getItem(`evy-les-${i}`)) || { done: false, date: '' };
                 const card = document.createElement('div');
                 card.className = `lesson-card ${savedData.done ? 'completed' : ''}`;
-                card.innerHTML = `<strong>Les ${i}</strong><button class="start-btn">START</button><br><br><label style="font-size:0.7rem"><input type="checkbox" ${savedData.done ? 'checked' : ''}> Klaar</label><div style="font-size:0.6rem; color:#888;">${savedData.date}</div>`;
-                
-                card.querySelector('input').onchange = (e) => {
-                    const d = e.target.checked ? new Date().toLocaleString('nl-NL') : '';
-                    localStorage.setItem(`les-data-${i}`, JSON.stringify({ done: e.target.checked, date: d }));
-                    buildGrid();
-                };
-                card.querySelector('.start-btn').onclick = () => runLes(schema, i);
+                card.innerHTML = `
+                    <strong>Les ${i}</strong><br>
+                    <button class="start-btn" data-les="${i}">START</button><br><br>
+                    <input type="checkbox" class="done-check" data-les="${i}" ${savedData.done ? 'checked' : ''}> Klaar
+                    <div style="font-size:0.6rem; color:#888;">${savedData.date}</div>
+                `;
                 grid.appendChild(card);
             }
         }
 
+        // EVENT DELEGATION: Eén luisteraar voor alle knoppen en checkboxes
+        document.getElementById('lessonGrid').addEventListener('click', (e) => {
+            const lesNr = e.target.getAttribute('data-les');
+            if (!lesNr) return;
+
+            if (e.target.classList.contains('start-btn')) {
+                runLes(evySchema[lesNr], lesNr);
+            } 
+            
+            if (e.target.classList.contains('done-check')) {
+                const d = e.target.checked ? new Date().toLocaleDateString('nl-NL') : '';
+                localStorage.setItem(`evy-les-${lesNr}`, JSON.stringify({ done: e.target.checked, date: d }));
+                buildGrid();
+            }
+        });
+
         async function runLes(schema, nr) {
             if (timerInterval) clearInterval(timerInterval);
             spreekUit(`Les ${nr} gestart.`);
-            const segs = schema.split('-');
+            const segs = schema.match(/(\d+[wl])/g);
             for (let s of segs) {
                 let tijd = parseInt(s) * 60;
                 let type = s.slice(-1);
@@ -117,16 +124,17 @@
                 });
             }
             audio.pause();
-            spreekUit("Klaar!");
-            localStorage.setItem(`les-data-${nr}`, JSON.stringify({ done: true, date: new Date().toLocaleString('nl-NL') }));
+            spreekUit("Gedaan!");
+            localStorage.setItem(`evy-les-${nr}`, JSON.stringify({ done: true, date: new Date().toLocaleDateString('nl-NL') }));
             buildGrid();
         }
 
-        document.getElementById('reset-btn').onclick = () => { if(confirm("Alles wissen?")) { localStorage.clear(); buildGrid(); } };
+        document.getElementById('reset-btn').onclick = () => { if(confirm("Wissen?")) { localStorage.clear(); buildGrid(); } };
+        document.getElementById('upload-w').onchange = (e) => playlists.w = Array.from(e.target.files).map(f => URL.createObjectURL(f));
+        document.getElementById('upload-l').onchange = (e) => playlists.l = Array.from(e.target.files).map(f => URL.createObjectURL(f));
         
-        // Startfuncties bij laden
-        showLastModified();
         buildGrid();
     </script>
 </body>
 </html>
+
