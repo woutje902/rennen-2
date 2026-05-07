@@ -3,77 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro</title>
+    <title>Run Coach Pro - Eigen Muziek</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #status-bar { 
             background: #1e1e1e; padding: 25px; border-radius: 20px; border: 1px solid #333; 
             width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px;
-            position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            position: sticky; top: 10px; z-index: 100;
         }
         #timer { font-size: 4.5rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 10px 0; }
         #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
+        
+        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; }
+        .upload-group { margin: 10px 0; display: flex; flex-direction: column; gap: 5px; }
+        input[type="file"] { color: #888; font-size: 0.8rem; }
+
         .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 600px; }
         .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
-        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
-        .start-btn:active { background: #27ae60; transform: scale(0.95); }
+        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <h1>🏃‍♂️ Run Coach Pro</h1>
 
-    <!-- Status bar is nu direct zichtbaar -->
     <div id="status-bar">
-        <div id="current-mode">Kies een les</div>
+        <div id="current-mode">Upload je muziek</div>
         <div id="timer">00:00</div>
-        <div id="track-info" style="font-size: 0.8rem; color: #888; margin-top: 10px;">Audio staat klaar</div>
     </div>
 
-    <!-- De lessen zijn nu direct zichtbaar -->
+    <!-- NIEUW: Upload sectie -->
+    <div class="setup-section">
+        <strong>Stap 1: Kies je muziek (.mp3)</strong>
+        <div class="upload-group">
+            <label>Muziek voor WANDELEN:</label>
+            <input type="file" id="upload-w" accept="audio/*">
+        </div>
+        <div class="upload-group">
+            <label>Muziek voor HARDLOPEN:</label>
+            <input type="file" id="upload-l" accept="audio/*">
+        </div>
+    </div>
+
     <div class="lesson-grid" id="lessonGrid"></div>
 
     <script>
         const audio = new Audio();
         let timerInterval = null;
+        
+        // Hier slaan we de "geüploade" bestanden tijdelijk op
+        const userSongs = { w: null, l: null };
 
-        // VERVANG DEZE LINKS door echte .mp3 links voor geluid!
-        const songs = {
-            w: "https://soundhelix.com",
-            l: "https://soundhelix.com"
-        };
+        // Luisteren naar uploads
+        document.getElementById('upload-w').addEventListener('change', (e) => handleUpload(e, 'w'));
+        document.getElementById('upload-l').addEventListener('change', (e) => handleUpload(e, 'l'));
+
+        function handleUpload(event, type) {
+            const file = event.target.files[0];
+            if (file) {
+                userSongs[type] = URL.createObjectURL(file);
+                spreekUit(`${type === 'w' ? 'Wandel' : 'Hardloop'} muziek geladen`);
+            }
+        }
 
         function spreekUit(tekst) {
             window.speechSynthesis.cancel();
             const msg = new SpeechSynthesisUtterance(tekst);
             msg.lang = 'nl-NL';
-            msg.rate = 0.9;
             window.speechSynthesis.speak(msg);
         }
 
-        // Lessen bouwen
         const grid = document.getElementById('lessonGrid');
         for (let i = 1; i <= 30; i++) {
             const schema = (i % 2 === 0) ? "2l-1w-2l" : "1l-1w-1l";
             const card = document.createElement('div');
             card.className = 'lesson-card';
             card.innerHTML = `<strong>Les ${i}</strong><br><button class="start-btn" style="margin-top:10px">START</button>`;
-            
-            // De audio wordt nu geactiveerd ZODRA je op een les klikt
-            card.querySelector('button').addEventListener('click', () => {
-                // Korte "silent" play om audio context te activeren voor mobiel
-                audio.play().then(() => audio.pause()).catch(e => console.log("Audio kickstart"));
-                runLes(schema, i);
-            });
+            card.querySelector('button').addEventListener('click', () => runLes(schema, i));
             grid.appendChild(card);
         }
 
-        async function runLes(schema, lesNummer) {
+        async function runLes(schema, nr) {
+            if (!userSongs.w || !userSongs.l) {
+                alert("Upload eerst muziek voor beide modi!");
+                return;
+            }
+
             if (timerInterval) clearInterval(timerInterval);
+            spreekUit(`Les ${nr} gestart.`);
+            
             const segs = schema.split('-');
-            
-            spreekUit(`Les ${lesNummer} gestart. Veel succes!`);
-            
             for (let s of segs) {
                 let tijd = parseInt(s) * 60;
                 let type = s.slice(-1);
@@ -81,9 +100,9 @@
                 document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
                 document.getElementById('current-mode').style.color = type === 'w' ? "#3498db" : "#e74c3c";
                 
-                audio.src = songs[type];
+                audio.src = userSongs[type];
                 audio.loop = true;
-                audio.play().catch(e => console.log("Speel af fout:", e));
+                audio.play();
                 
                 spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
 
@@ -96,8 +115,7 @@
                 });
             }
             audio.pause();
-            document.getElementById('current-mode').innerText = "KLAAR!";
-            spreekUit("Gefeliciteerd, de training is voltooid!");
+            spreekUit("Training klaar!");
         }
     </script>
 </body>
