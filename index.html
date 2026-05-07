@@ -3,43 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run-Walk Tracker</title>
+    <title>Run Coach Pro - Originele Audio Fix</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; }
+        #timer { font-size: 4rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
+        #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
+        .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
+        .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
+        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        #unlock-audio { background: #f1c40f; color: black; padding: 15px; border-radius: 10px; border: none; font-weight: bold; margin-bottom: 15px; cursor: pointer; width: 100%; max-width: 500px; }
+    </style>
 </head>
 <body>
-    <div style="font-size: 0.8em; color: gray;">Laatst aangepast: 07-05-2024</div>
-    <h1>Interval Tracker</h1>
-    
-    <button id="startBtn" style="padding: 20px; font-size: 20px;">START TRAINING</button>
-    
-    <p id="status">Status: Klik op start</p>
-    <p id="gps-data">Locatie: Zoeken...</p>
 
-    <audio id="audioPlayer">
-        <source src="muziek.mp3" type="audio/mpeg">
-    </audio>
+    <h1>🏃‍♂️ Run Coach Pro</h1>
+
+    <button id="unlock-audio">⚠️ TIK HIER OM AUDIO TE ACTIVEREN</button>
+
+    <div id="status-bar">
+        <div id="current-mode">Kies een les</div>
+        <div id="timer">00:00</div>
+    </div>
+
+    <div class="lesson-grid" id="lessonGrid"></div>
 
     <script>
-        const startBtn = document.getElementById('startBtn');
-        const audio = document.getElementById('audioPlayer');
-        const statusText = document.getElementById('status');
-        const gpsText = document.getElementById('gps-data');
+        const audio = new Audio();
+        audio.crossOrigin = "anonymous";
+        let timerInterval = null;
 
-        startBtn.onclick = function() {
-            // Audio direct starten
-            audio.play();
-            statusText.innerText = "Status: Programma loopt";
-
-            // GPS starten
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(function(position) {
-                    gpsText.innerText = "Locatie: " + position.coords.latitude.toFixed(4) + ", " + position.coords.longitude.toFixed(4);
-                }, function(error) {
-                    gpsText.innerText = "GPS Fout: " + error.message;
-                }, { enableHighAccuracy: true });
-            } else {
-                gpsText.innerText = "Geen GPS beschikbaar";
-            }
+        const playlists = { 
+            w: "https://soundhelix.com", 
+            l: "https://soundhelix.com" 
         };
+
+        const evySchema = { 1: "1l-1w-1l-1w-2l-2w-2l-2w-3l-3w", 2: "1l-1w-1l-1w-2l-2w-3l-3w-3l-3w", 30: "30l" };
+
+        // Essentiële stap voor browsers: unlock de audio bij een klik
+        document.getElementById('unlock-audio').onclick = function() {
+            audio.src = playlists.w;
+            audio.play().then(() => {
+                audio.pause();
+                this.style.display = 'none';
+                spreekUit("Audio geactiveerd. Succes!");
+            }).catch(e => alert("Tik nogmaals om geluid toe te staan."));
+        };
+
+        function spreekUit(t) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(t);
+            msg.lang = 'nl-NL';
+            window.speechSynthesis.speak(msg);
+        }
+
+        function speelMuziek(type) {
+            audio.src = playlists[type];
+            audio.play().catch(e => console.log("Audio trigger nodig"));
+        }
+
+        async function runLes(lesNr) {
+            if (timerInterval) clearInterval(timerInterval);
+            const schema = evySchema[lesNr] || "1l-1w-1l";
+            const segs = schema.match(/(\d+[wl])/g);
+            
+            for (let s of segs) {
+                let tijd = parseInt(s) * 60;
+                let type = s.slice(-1);
+                
+                document.getElementById('current-mode').innerText = type === 'w' ? "WANDELEN" : "HARDLOPEN";
+                speelMuziek(type);
+                spreekUit(`Nu ${parseInt(s)} minuten ${type === 'w' ? 'wandelen' : 'hardlopen'}`);
+
+                await new Promise(res => {
+                    timerInterval = setInterval(() => {
+                        let m = Math.floor(tijd / 60), sec = tijd % 60;
+                        document.getElementById('timer').innerText = `${m}:${sec < 10 ? '0'+sec : sec}`;
+                        if (tijd-- <= 0) { clearInterval(timerInterval); res(); }
+                    }, 1000);
+                });
+            }
+            audio.pause();
+            spreekUit("Gedaan!");
+        }
+
+        const grid = document.getElementById('lessonGrid');
+        for (let i = 1; i <= 30; i++) {
+            const card = document.createElement('div');
+            card.className = 'lesson-card';
+            card.innerHTML = `<strong>Les ${i}</strong><br><button class="start-btn" onclick="runLes(${i})">START</button>`;
+            grid.appendChild(card);
+        }
     </script>
 </body>
 </html>
