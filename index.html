@@ -3,25 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Coach Pro - Evy Gruyaert Edition</title>
+    <title>Run Coach Pro - Evy Gruyaert</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #status-bar { background: #1e1e1e; padding: 20px; border-radius: 20px; border: 2px solid #2ecc71; width: 100%; max-width: 500px; text-align: center; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         #timer { font-size: 4.5rem; font-weight: bold; font-family: monospace; color: #2ecc71; margin: 5px 0; }
         #current-mode { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; color: #1DB954; }
-        #now-playing { font-size: 0.75rem; color: #888; margin-top: 10px; font-style: italic; border-top: 1px solid #333; padding-top: 5px; }
+        #now-playing { font-size: 0.8rem; color: #888; margin-top: 10px; font-style: italic; background: #222; padding: 5px; border-radius: 5px; }
+        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; text-align: center; }
         .lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; max-width: 650px; }
         .lesson-card { background: #181818; border: 1px solid #333; padding: 15px; border-radius: 12px; text-align: center; }
         .lesson-card.completed { border-color: #2ecc71; background: #0f1a12; }
-        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: 0.2s; }
-        .start-btn:active { transform: scale(0.95); background: #27ae60; }
-        .setup-section { background: #181818; padding: 15px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; border: 1px dashed #444; text-align: center; }
-        input[type="file"] { font-size: 0.7rem; margin: 5px 0; }
+        .start-btn { width: 100%; padding: 12px; background: #2ecc71; border: none; color: black; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        #unlock-audio { background: #f1c40f; color: black; padding: 15px; border-radius: 10px; border: none; font-weight: bold; margin-bottom: 15px; cursor: pointer; width: 100%; max-width: 500px; }
     </style>
 </head>
 <body>
 
     <h1>🏃‍♂️ Run Coach Pro</h1>
+
+    <!-- Deze knop is nodig om de muziekbeveiliging van de browser te omzeilen -->
+    <button id="unlock-audio">⚠️ STAP 1: ACTIVEER AUDIO/MUZIEK</button>
+
     <div id="status-bar">
         <div id="current-mode">Kies een les</div>
         <div id="timer">00:00</div>
@@ -29,29 +32,24 @@
     </div>
 
     <div class="setup-section">
-        <strong>Audio Bronnen</strong><br>
-        <small style="color:#888">Standaard muziek is actief, of upload eigen MP3's:</small><br><br>
-        <div style="text-align: left; display: inline-block;">
-            Wandelen: <input type="file" id="upload-w" accept="audio/*" multiple><br>
-            Lopen: <input type="file" id="upload-l" accept="audio/*" multiple>
-        </div><br><br>
-        <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">WIS VOORTGANG</button>
+        <strong>Eigen MP3's (Optioneel)</strong><br>
+        <input type="file" id="upload-w" accept="audio/*" multiple> Wandel<br>
+        <input type="file" id="upload-l" accept="audio/*" multiple> Lopen<br><br>
+        <button id="reset-btn" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">WIS VOORTGANG</button>
     </div>
 
     <div class="lesson-grid" id="lessonGrid"></div>
 
     <script>
         const audio = new Audio();
+        audio.crossOrigin = "anonymous"; // Helpt bij het laden van externe muziek
         let timerInterval = null;
         let currentType = '';
 
-        // STANDAARD MUZIEK (SOUNDHELIX)
+        // Vernieuwde muzieklinks (rechtenvrije loops)
         const defaultPlaylists = { 
-            w: ["https://soundhelix.com"], 
-            l: [
-                "https://soundhelix.com",
-                "https://soundhelix.com"
-            ] 
+            w: ["https://pixabay.com"], 
+            l: ["https://pixabay.com"] 
         };
 
         let activePlaylists = { ...defaultPlaylists };
@@ -69,16 +67,23 @@
             28: "25l-3w", 29: "28l-2w", 30: "30l"
         };
 
+        // Stap 1: Activeer audio
+        document.getElementById('unlock-audio').onclick = function() {
+            audio.play().then(() => {
+                audio.pause();
+                this.style.display = 'none';
+                spreekUit("Audio geactiveerd. Kies nu een les.");
+            }).catch(() => alert("Klik nogmaals om geluid toe te staan."));
+        };
+
         function speelMuziek(type) {
             currentType = type;
             const list = activePlaylists[type];
             if(list && list.length > 0) {
                 const track = list[Math.floor(Math.random() * list.length)];
                 audio.src = track;
-                // Visuele update
-                const trackName = track.includes('blob:') ? "Eigen bestand" : track.split('/').pop();
-                document.getElementById('now-playing').innerText = "🎵 Nu speelt: " + trackName;
-                audio.play().catch(e => console.log("Audio start pas na interactie"));
+                document.getElementById('now-playing').innerText = "🎵 Muziek: " + (type === 'w' ? 'Wandelen' : 'Hardlopen');
+                audio.play().catch(e => console.log("Fout bij afspelen:", e));
             }
         }
 
@@ -98,9 +103,8 @@
                 card.className = `lesson-card ${savedData.done ? 'completed' : ''}`;
                 card.innerHTML = `
                     <strong>Les ${i}</strong><br>
-                    <button class="start-btn" data-les="${i}">START LES</button><br><br>
+                    <button class="start-btn" data-les="${i}">START</button><br><br>
                     <input type="checkbox" class="done-check" data-les="${i}" ${savedData.done ? 'checked' : ''}> Klaar
-                    <div style="font-size:0.6rem; color:#888; margin-top:5px;">${savedData.date}</div>
                 `;
                 grid.appendChild(card);
             }
@@ -139,13 +143,12 @@
                 });
             }
             audio.pause();
-            document.getElementById('now-playing').innerText = "Les voltooid!";
-            spreekUit("Geweldig gewerkt! De les is klaar.");
+            spreekUit("Les voltooid! Goed gedaan.");
             localStorage.setItem(`evy-les-${nr}`, JSON.stringify({ done: true, date: new Date().toLocaleDateString('nl-NL') }));
             buildGrid();
         }
 
-        document.getElementById('reset-btn').onclick = () => { if(confirm("Voortgang wissen?")) { localStorage.clear(); buildGrid(); } };
+        document.getElementById('reset-btn').onclick = () => { if(confirm("Wissen?")) { localStorage.clear(); buildGrid(); } };
         document.getElementById('upload-w').onchange = (e) => activePlaylists.w = Array.from(e.target.files).map(f => URL.createObjectURL(f));
         document.getElementById('upload-l').onchange = (e) => activePlaylists.l = Array.from(e.target.files).map(f => URL.createObjectURL(f));
         
